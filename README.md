@@ -27,5 +27,6 @@ docker build --tag lews-pipeline-<module name> .
 docker run -e KAFKA_BROKER="<kafka-broker-host:port>" \
 -e MODULE_NAME="Geo-Lookup" \
 -e MODULE_SRC_TOPIC="lews-twitter" \
+-e OSM_LOOKUP_URL="<OSM Template URL>"
 -e MODULE_TGT_TOPIC="es_sync" lews-pipeline-geo-lookup
 ```
