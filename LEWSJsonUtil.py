@@ -10,15 +10,16 @@ class JsonDataUtil():
 
         if 'lews_metadata' not in self.json_data:
 
-            self.new_json_data['raw_data'] = self.json_data
+            self.new_json_data['raw_data'] = json.loads(self.json_data)
             self.new_json_data['lews_metadata'] = {}
 
     def get_value(self,field):
+
         return self.new_json_data['raw_data'][field]
       #  print(self.json_data)
 
     def add_metadata(self,key,value):
-        self.new_json_data['lews_metadata'][key]=value
+        self.new_json_data['lews_metadata'][key]=json.loads(value)
 
         #print(self.json_data)
 
