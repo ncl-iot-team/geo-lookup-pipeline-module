@@ -3,4 +3,4 @@ COPY . /app
 WORKDIR /app
 RUN pip install -r requirements.txt
 ENV PYTHONUNBUFFERED=1
-ENTRYPOINT ["python", "Kafka-stream-process.py"]
+ENTRYPOINT ["python", "geo-lookup.py"]
