@@ -8,7 +8,7 @@ import time
 import requests
 
 s_kafka_servers = os.environ.get("SOURCE_KAFKA_BOOTSTRAP_SERVERS","localhost:9092").split(",")
-t_kafka_servers = os.environ.get("TARGET_KAFKA_BOOTSTRAP_SERVERS",t_kafka_servers).split(",")
+t_kafka_servers = os.environ.get("TARGET_KAFKA_BOOTSTRAP_SERVERS",s_kafka_servers).split(",")
 s_topic = os.environ.get('MODULE_SRC_TOPIC','lews-twitter')
 t_topic = os.environ.get('MODULE_TGT_TOPIC','t_topic')
 proc_name = os.environ.get('MODULE_NAME','Module01')
