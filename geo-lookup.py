@@ -7,6 +7,21 @@ import spacy
 import time
 import requests
 
+s_kafka_servers = os.environ.get("SOURCE_KAFKA_BOOTSTRAP_SERVERS","localhost:9092").split(",")
+t_kafka_servers = os.environ.get("TARGET_KAFKA_BOOTSTRAP_SERVERS",t_kafka_servers).split(",")
+s_topic = os.environ.get('MODULE_SRC_TOPIC','lews-twitter')
+t_topic = os.environ.get('MODULE_TGT_TOPIC','t_topic')
+proc_name = os.environ.get('MODULE_NAME','Module01')
+osm_lookup_url = os.environ.get('OSM_LOOKUP_URL','https://photon.komoot.de/api/?q=%s')
+
+print("Environment variables:")
+print(f"SOURCE_KAFKA_BOOTSTRAP_SERVERS = {s_kafka_servers}")
+print(f"TARGET_KAFKA_BOOTSTRAP_SERVERS = {t_kafka_servers}")
+print(f"MODULE_SRC_TOPIC = {s_topic}")
+print(f"MODULE_TGT_TOPIC = {t_topic}")
+print(f"MODULE_NAME = {proc_name}")
+print(f"OSM_LOOKUP_URL = {osm_lookup_url}")
+
 #--------------- Template Code, Avoid changing anything in this section --------------------------# 
 class AbstractKafkaInStreamProcessor(ABC):
         
@@ -50,16 +65,18 @@ class AbstractKafkaInStreamProcessor(ABC):
         
         self.target_topic = target_topic
         
-        #self.bootstrap_servers = os.getenv('KAFKA_BROKER','host.docker.internal:9092')
-        self.bootstrap_servers = 'localhost:9092'
+        self.s_bootstrap_servers = s_kafka_servers 
+
+        self.t_bootstrap_servers = t_kafka_servers 
+        #self.bootstrap_servers = 'localhost:9092'
         
         print("Initializing Kafka In-Stream Processor Module")
         
-        self.consumer = KafkaConsumer(source_topic,group_id = self.processor_name, bootstrap_servers = self.bootstrap_servers,value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+        self.consumer = KafkaConsumer(source_topic,group_id = self.processor_name, bootstrap_servers = self.s_bootstrap_servers,value_deserializer=lambda m: json.loads(m.decode('utf-8')))
 
        # self.producer = KafkaProducer(bootstrap_servers=self.bootstrap_servers)
 
-        self.producer = KafkaProducer(bootstrap_servers=self.bootstrap_servers, value_serializer = lambda v: json.dumps(v).encode('utf-8'))
+        self.producer = KafkaProducer(bootstrap_servers=self.t_bootstrap_servers, value_serializer = lambda v: json.dumps(v).encode('utf-8'))
 
 
 
@@ -84,7 +101,7 @@ class NlpResearch:
         self.chunksize = 1000
         self.output_fields = 'text'
         self.gcache = dict()
-        self.url_template = "https://photon.komoot.de/api/?q=%s"
+        self.url_template = osm_lookup_url
         # self.url_template = "http://localhost:2322/api/?q=%s"
         self.nlp = spacy.load("en_core_web_sm")
 
