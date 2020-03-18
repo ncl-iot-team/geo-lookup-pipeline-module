@@ -103,7 +103,7 @@ class NlpResearch:
         self.gcache = dict()
         self.url_template = osm_lookup_url
         # self.url_template = "http://localhost:2322/api/?q=%s"
-        self.nlp = spacy.load("en_core_web_sm")
+        self.nlp = spacy.load("en_core_web_lg")
 
     # ----Spacy Functions --------------
     # Helps in converting the first letter of each sentence to capital
@@ -114,7 +114,9 @@ class NlpResearch:
     def get_geotag(self, text):
         gtag = []
         doc = self.nlp(text)
+        print(f"Entities:{doc.ents}")
         for E in doc.ents:
+            print(f"E.label_:{E.label_}")
             if E.label_ in ['GPE', 'LOC']:
                 if self.output_fields == 'text':
                     gtag.append(E.text)
@@ -190,16 +192,14 @@ class NlpResearch:
 
     # To create a JSON format output strcture which makes it easy
     # for indexing in elastic search
-    def create_output_struct(self, text, timestamp, user_mentions):
-        result = {'media': 'twitter'}
-        result['time of publish'] = timestamp
-        result['raw_data'] = text
+    def create_output_struct(self, user_mentions):
+
         mentions = []
         for m in user_mentions:
             for rec in m[1]:
-                mentions.append({'place': rec[0], 'geotag': {'lat': rec[1], 'lon': rec[2]}})
-        result['mentions'] = mentions
-
+                #mentions.append({'place': rec[0], 'location': {'lat': rec[2], 'lon': rec[1]}})
+                mentions.append({'lat': rec[2], 'lon': rec[1]})
+        result = mentions
         return result
 
     # Pandas data analytics framework to access data easily
@@ -221,19 +221,24 @@ class ConKafkaInStreamProcessor(AbstractKafkaInStreamProcessor):
             #-- Perform all the module logic here --#
 
             # To get value from a field (Example)
-            util.json_util = util.JsonDataUtil(message.value)
+            json_util = util.JsonDataUtil(message.value)
+
+            json_util.retain_fields(["created_at","id","text","user","place"])
             
 
-            tweet_text = util.json_util.get_value("text")
+            tweet_text = json_util.get_value("text")
             #Do Processing
 
             plist = self.nlp_object.process(tweet_text)
-            mentions = self.nlp_object.places_to_geo_coordinates(plist) 
+            user_mentions = self.nlp_object.places_to_geo_coordinates(plist) 
+            mentions = self.nlp_object.create_output_struct(user_mentions)
 
 
 
             #Adding metadata to the record (Example)
-            util.json_util.add_metadata("mentions",json.dumps(mentions))
+
+            if len(mentions)>0:
+                json_util.add_metadata("lews_meta_mentions_location",json.dumps(mentions[0]))
             #util.json_util.add_metadata("Longitude","-1.617780")
 
         except:
@@ -241,7 +246,7 @@ class ConKafkaInStreamProcessor(AbstractKafkaInStreamProcessor):
             raise
 
         #Get the processed record with metadata added
-        processes_message = util.json_util.get_json()
+        processes_message = json_util.get_json()
         #print("Processes Message:",json.dumps(processes_message))
         #time.sleep(1)
 #---------------------- Add module logic in this section (End) ----------------------#
