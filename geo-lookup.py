@@ -7,18 +7,18 @@ import spacy
 import time
 import requests
 
-s_kafka_servers = os.environ.get("SOURCE_KAFKA_BOOTSTRAP_SERVERS","localhost:9092").split(",")
-t_kafka_servers = os.environ.get("TARGET_KAFKA_BOOTSTRAP_SERVERS","localhost:9092").split(",")
-s_topic = os.environ.get('MODULE_SRC_TOPIC','lews-twitter')
-t_topic = os.environ.get('MODULE_TGT_TOPIC','t_topic')
-proc_name = os.environ.get('MODULE_NAME','Module01')
+kafka_src_server = os.environ.get("KAFKA_SOURCE_BOOTSTRAP_SERVERS","localhost:9092").split(",")
+kafka_src_topic = os.environ.get('KAFKA_SOURCE_TOPIC', 't_topic1')
+kafka_tgt_server = os.environ.get("KAFKA_TARGET_BOOTSTRAP_SERVERS","localhost:9092").split(",")
+kafka_tgt_topic = os.environ.get('KAFKA_TARGET_TOPIC','t_topic2')
+proc_name = os.environ.get('MODULE_NAME','USER_CLASSIFICATION')
 osm_lookup_url = os.environ.get('OSM_LOOKUP_URL','https://photon.komoot.de/api/?q=%s')
 
 print("Environment variables:")
-print(f"SOURCE_KAFKA_BOOTSTRAP_SERVERS = {s_kafka_servers}")
-print(f"TARGET_KAFKA_BOOTSTRAP_SERVERS = {t_kafka_servers}")
-print(f"MODULE_SRC_TOPIC = {s_topic}")
-print(f"MODULE_TGT_TOPIC = {t_topic}")
+print(f"KAFKA_SOURCE_BOOTSTRAP_SERVERS = {kafka_src_server}")
+print(f"KAFKA_SOURCE_TOPIC = {kafka_src_topic}")
+print(f"KAFKA_TARGET_BOOTSTRAP_SERVERS = {kafka_tgt_server}")
+print(f"KAFKA_TARGET_TOPIC = {kafka_tgt_topic}")
 print(f"MODULE_NAME = {proc_name}")
 print(f"OSM_LOOKUP_URL = {osm_lookup_url}")
 
@@ -26,9 +26,10 @@ print(f"OSM_LOOKUP_URL = {osm_lookup_url}")
 class AbstractKafkaInStreamProcessor(ABC):
         
     def produce_data_kafka(self,record) -> None:
-      
-      self.producer.send(topic=self.target_topic,value=record)
-      #print("Processed Record Sent")
+
+      self.producer.send(topic=kafka_tgt_topic,value=record)
+
+      print("Processed Record Sent")
 
 
 
@@ -42,12 +43,11 @@ class AbstractKafkaInStreamProcessor(ABC):
     def kafka_in_stream_processor(self) -> None:
 
         for message in self.consumer:
-            
-           # try:
+            try:
                 self.processed_record = self.process_data(message)
                 self.produce_data_kafka(self.processed_record)
-           # except Exception as e:
-           #     print("Skipping Record..",str(e))
+            except Exception as e:
+                print("Skipping Record..",str(e))
 
         
             
@@ -55,28 +55,15 @@ class AbstractKafkaInStreamProcessor(ABC):
 
 
 
-    def __init__(self,processor_name,source_topic,target_topic,nlp_object):
+    def __init__(self,nlp_object):
 
         self.nlp_object = nlp_object 
+        
+        print("Initializing Kafka Consumer")
+        self.consumer = KafkaConsumer(kafka_src_topic, group_id = proc_name, bootstrap_servers = kafka_src_server,value_deserializer=lambda m: json.loads(m.decode('utf-8')))
 
-        self.processor_name = processor_name
-        
-        self.source_topic = source_topic
-        
-        self.target_topic = target_topic
-        
-        self.s_bootstrap_servers = s_kafka_servers 
-
-        self.t_bootstrap_servers = t_kafka_servers 
-        #self.bootstrap_servers = 'localhost:9092'
-        
-        print("Initializing Kafka In-Stream Processor Module")
-        
-        self.consumer = KafkaConsumer(source_topic,group_id = self.processor_name, bootstrap_servers = self.s_bootstrap_servers,value_deserializer=lambda m: json.loads(m.decode('utf-8')))
-
-       # self.producer = KafkaProducer(bootstrap_servers=self.bootstrap_servers)
-
-        self.producer = KafkaProducer(bootstrap_servers=self.t_bootstrap_servers, value_serializer = lambda v: json.dumps(v).encode('utf-8'))
+        print("Initializing Kafka Producer") 
+        self.producer = KafkaProducer(bootstrap_servers = kafka_tgt_server, value_serializer = lambda v: json.dumps(v).encode('utf-8'))
 
 
 
@@ -222,8 +209,6 @@ class ConKafkaInStreamProcessor(AbstractKafkaInStreamProcessor):
 
             # To get value from a field (Example)
             json_util = util.JsonDataUtil(message.value)
-
-            json_util.retain_fields(["created_at","id","text","user","place"])
             
 
             tweet_text = json_util.get_value("text")
@@ -257,14 +242,7 @@ class ConKafkaInStreamProcessor(AbstractKafkaInStreamProcessor):
 
 
 if __name__ == "__main__":
-
-    #processor_name: Unique processor name for the module, 
-    #source_topic: Topic from which the module should accept the record to be processed, 
-    # target_topic: Topic to which the module publishes the processed record
-   s_topic = os.getenv('MODULE_SRC_TOPIC','lews-twitter')
-   t_topic = os.getenv('MODULE_TGT_TOPIC','t_topic')
-   proc_name = os.getenv('MODULE_NAME','Module01')
-
-   nlp_obj = NlpResearch()
-   
-   run(ConKafkaInStreamProcessor(processor_name=proc_name, source_topic=s_topic, target_topic=t_topic, nlp_object=nlp_obj))
+    
+    nlp_obj = NlpResearch()
+    
+    run(ConKafkaInStreamProcessor(nlp_obj))
